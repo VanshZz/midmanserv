@@ -3,6 +3,8 @@ import time
 from flask import Flask, json, request, jsonify, Response
 from pymongo import MongoClient
 import base64
+from gevent import monkey ##
+monkey.patch_all()
 import os
 app = Flask(__name__)
 
