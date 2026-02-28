@@ -7,18 +7,15 @@ from gevent import monkey ##
 monkey.patch_all()
 import os
 app = Flask(__name__)
-
-try:
-    mongo_uri = os.environ.get("MONGO_URI")
-    client = MongoClient(mongo_uri)
-    db = client['Stealthpoint_DB']
-    log_collection = db['logs']
-    print("MongoDB connected successfully")
-except Exception as e:
-    print(f"Error connecting to MongoDB: {e}")
-    db = None
-    log_collection = None
-
+def get_db():
+    try:
+        client = MongoClient(os.environ.get("MONGO_URI"), connect=False)
+        return client['Stealthpoint_DB']
+    except Exception as e:
+        print(f"Error connecting to MongoDB: {e}")
+        return None
+db = get_db()
+log_collection = db.logs
 #s
 @app.route("/")
 def home():
