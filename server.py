@@ -99,6 +99,14 @@ def receive_logs(ip):
     db.logs.insert_one(logs_json_data)
     return jsonify({"status": "success"}), 200
 
+@app.route('/api/<ip>/output', methods=['POST'])
+def receive_output(ip):
+    db = MongoHelper.get_db()
+    output_json_data = request.get_json()
+    
+    db.output.insert_one(output_json_data)
+    return jsonify({"status": "success"}), 200
+
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5000))
     app.run(host='0.0.0.0', port=port)
