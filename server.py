@@ -39,7 +39,7 @@ def check_command(ip, username):
 
     active_agents[ip.strip()] = {
             "username": username,
-            "last_seen": time.strftime("%H:%M:%S"),
+            "last_seen": time.time(),
             "status": "Online"
         }
     print(f"[*] Agent Joined: {username} ({ip})")
